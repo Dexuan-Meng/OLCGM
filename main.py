@@ -6,6 +6,9 @@ import argparse
 from torch.nn import CrossEntropyLoss
 from torch.optim import SGD
 
+import sys
+sys.path.append('avalanche')
+
 from avalanche.benchmarks import nc_benchmark
 from avalanche.training.strategies import Naive
 from avalanche.training.plugins.replay import ReplayPlugin,\

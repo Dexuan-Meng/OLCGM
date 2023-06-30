@@ -29,6 +29,9 @@ from Plugins.OnlineReplay import OnlineReplay
 from utils import get_modified_dataset, get_network
 from avalanche.benchmarks import data_incremental_benchmark, benchmark_with_validation_stream
 
+import wandb
+wandb.login()
+
 def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -36,6 +39,7 @@ def set_seed(seed):
     random.seed(seed)
     torch.backends.cudnn.enabled = False
     torch.backends.cudnn.deterministic = True
+
 
 
 def run_experiment(args):
@@ -133,9 +137,9 @@ def run_experiment(args):
     wandb_logger = None
     logger = None
     if args.run is not None and args.logger == 1:
-        args.project = 'thesis'
+        args.project = 'OLCGM'
 
-        wandb_logger = WandBLogger(project_name='thesis', run_name=args.run,
+        wandb_logger = WandBLogger(project_name='OLCGM', run_name=args.run,
                                    config=args)
         loggers.append(wandb_logger)
 
@@ -256,6 +260,55 @@ def run_experiment(args):
     return final_forgetting, final_accuracy
 
 
+# # Define sweep config
+# sweep_configuration_1 = {
+#     'method': 'grid',
+#     'name': 'sweep',
+#     'metric': {'goal': 'maximize', 'name': 'val_acc'},
+#     'parameters': 
+#     {
+#         'batch_size': {'values': [16, 32, 64]},
+#         'epochs': {'values': [5, 10, 15]},
+#         'lr': {'max': 0.1, 'min': 0.0001}
+#      }
+# }
+
+# sweep_configuration_2 = {
+#     'method': 'grid',
+#     'name': 'sweep',
+#     'metric': {'goal': 'maximize', 'name': 'val_acc'},
+#     'parameters': 
+#     {
+#         'batch_size': {'values': [16, 32, 64]},
+#         'epochs': {'values': [5, 10, 15]},
+#         'lr': {'max': 0.1, 'min': 0.0001}
+#      }
+# }
+
+# sweep_configuration_olcgm = {
+#     'method': 'grid',
+#     'name': 'olcgm_M10_mnist_fashion',
+#     'metric': {'goal': 'maximize', 'name': 'Top1_Acc_Stream/eval_phase/test_stream/Task000'},
+#     'parameters': 
+#     {
+#         'ol': {'values': [100, 200]},
+#         'il': {'values': [1]},
+#         'lr': {'values': [0.1, 0.01]},
+#         'dataset': {'values': ["mnist", "fashion"]},
+#         'model_name': {'values': ["mlp"]},
+#         'memory': {'values': [10]},
+#         # 'memory': {'values': [10, 20, 50, 100, 200]},
+#         'k': {'values': [10]},
+#         'plugin': {'values': ['olcgm']}
+#      }
+# }
+# # Initialize sweep by passing in config. 
+# sweep_id = wandb.sweep(
+#   sweep=sweep_configuration_olcgm, 
+#   project='OLCGM'
+#   )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_ex', type=int, default=500,
@@ -276,17 +329,17 @@ if __name__ == "__main__":
                         help='Name of the wandb run if not specified wandb will not be used')
     parser.add_argument('--l2_w', type=float, default=0.0,
                         help='l2 weight decay used in the optimiizer of the coefficient of the linear combination')
-    parser.add_argument('--plugin', type=str, default='lcgm', choices=['olcgm', 'lcgm', 'rr', 'orr', 'gm', 'ogm'],
+    parser.add_argument('--plugin', type=str, default='olcgm', choices=['olcgm', 'lcgm', 'rr', 'orr', 'gm', 'ogm'],
                         help='plugin to use: rr is random replay')
     parser.add_argument('--logger', type=int, default=1, choices=[0, 1],
-                        help='1 if you want to log the metrics')
+                        help='1 if you want to log the metrics') 
     parser.add_argument('--condense_nw', action='store_true',
                         help='1 if you want to condense the new images when added to the memory')
     parser.add_argument('--debug', action='store_true',
                         help='debug mode')
     parser.add_argument('--mb_size', type=int, default=10,
                         help='size of the mini-batchs')
-    parser.add_argument('-k', type=int, default=5,
+    parser.add_argument('--k', type=int, default=5,
                         help='condensation rate')
     parser.add_argument('--val_size', type=int, default=0,
                         help='validation size')
@@ -295,3 +348,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print(run_experiment(args))
+    # wandb.agent(sweep_id, function=run_experiment(args))

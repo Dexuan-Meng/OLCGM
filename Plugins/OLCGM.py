@@ -51,7 +51,8 @@ class OnlineGradientMatchingStoragePolicy(StoragePolicy):
                  Optional["ClassExemplarsSelectionStrategy"] = None,
                  iteration=1, outer_loop=1, lr_w=0.1, l2_w=0.0,
                  image_size=(1, 28, 28), inner_loop=1, dataset='mnist',
-                 debug=False, k=5, dl=1, plugin='', condense_new_data=False):
+                 debug=False, k=5, dl=1, plugin='', condense_new_data=False,
+                 mask='default'):
 
         super().__init__(ext_mem, mem_size)
         self.selection_strategy = selection_strategy or \
@@ -76,6 +77,7 @@ class OnlineGradientMatchingStoragePolicy(StoragePolicy):
         self.dl = dl
         self.plugin = plugin
         self.statistics = {}
+        self.mask = mask
         if not self.adaptive_size:
             assert self.total_num_classes > 0, \
                 """When fixed exp mem size, total_num_classes should be > 0."""

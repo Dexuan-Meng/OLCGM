@@ -160,7 +160,7 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
                 weights_dict_cp = copy.deepcopy(weights_dict)
                 for key in weights_dict_cp.keys():
                     weights_dict_cp[key] = normalize_coefficients(weights_dict_cp[key], masks[key])
-                imgs_syn = get_all_condensed_images(weights_dict_cp, real_imgs, classes,masks, strategy.device)
+                imgs_syn = get_all_condensed_images(weights_dict_cp, real_imgs, classes, masks, strategy.device)
             net = update_network(self, imgs_syn, label_syn, strategy,
                                     optimizer_net, net)
 
@@ -204,11 +204,15 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
         [0 0 0 0 0 0 1 1 0 0]
         [0 0 0 0 0 0 0 0 1 1]
         '''
-
-        mask = torch.zeros(size=weight.shape,requires_grad=False,device=strategy.device)
-        for i in range(len(mask)):
-            indexes = [2 * i, 2 * i + 1]
-            mask[i][indexes] = 1.0
+        if 'default' in self.mask:
+            mask = torch.zeros(size=weight.shape,requires_grad=False,device=strategy.device)
+            for i in range(len(mask)):
+                indexes = [2 * i, 2 * i + 1]
+                mask[i][indexes] = 1.0
+            masks[c] = mask
+        elif 'No' in self.mask:
+            mask = torch.ones(size=weight.shape, requires_grad=False, device=strategy.device)
+        
         masks[c] = mask
 
     with torch.no_grad():
@@ -222,7 +226,7 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
             imgs = get_all_condensed_images(weights_dict, real_imgs, classes, masks,strategy.device)
             save_images(self.dataset, self.mem_size, imgs,
                         log + '_' + str(exp_counter) + '_start', 'single', self.wandb_logger, exp_counter)
-
+    
     optimizer_weights = torch.optim.SGD(
         [weights for weights in weights_dict.values()],
         lr=self.lr_w, weight_decay=self.l2_w, momentum=0.5
@@ -231,7 +235,11 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
     
     iterationBody(self, strategy, real_imgs, weights_dict, criterion,
                     classes, optimizer_weights, masks)
-
+    
+    if 'Normal' in self.mask:
+        for key in weights_dict.keys():
+            weights_dict[key] = normalize_coefficients(weights_dict[key], masks[key])
+    
     condensed_datasets = {}
     for c in classes:
         weights_dict[c] = normalize_coefficients(weights_dict[c], masks[c])

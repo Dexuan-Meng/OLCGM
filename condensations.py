@@ -84,7 +84,12 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
                 if torch.sum(weights[i]) > 0:
                     # w_mask = weights[i] * mask[i]
                     weights[i] = weights[i] / torch.sum(weights[i])
-        return weights
+                    if 'Train' in self.mask:
+                        mask[i] = mask[i] / torch.sum(mask[i]) * 2
+        if 'Train' in self.mask:
+            return weights, mask
+        else:
+            return weights
 
     def mini_batch_update(self, strategy, real_imgs, net, criterion,
                         weights_dict, loss, c, net_parameters, masks):
@@ -137,8 +142,10 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
                         loss_name)
 
             optimizer_weights.zero_grad()
+            optimizer_mask.zero_grad()
             loss.backward()
             optimizer_weights.step()
+            optimizer_mask.step()
 
             with torch.no_grad():
                 for c in weights_dict.keys():
@@ -152,15 +159,27 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
                             i = torch.randint(low=0, high=len(idxs_ones) - 1, size=(1,) )
                             weights_dict[c][id_row][idxs_ones[i]] = 1.0
 
+            with torch.no_grad():        
+                if 'Train' in self.mask:
+                    with torch.no_grad():
+                        for c in masks.keys():
+                            _, idx = torch.sort(mask[c], descending=True)
+                            mask_mask = idx < 2
+                            masks[c][i] = mask[c][i] * mask_mask
 
             if ol == self.outer_loop - 1:
                 break
 
             with torch.no_grad():
                 weights_dict_cp = copy.deepcopy(weights_dict)
+                masks_cp = copy.deepcopy(masks)
                 for key in weights_dict_cp.keys():
-                    weights_dict_cp[key] = normalize_coefficients(weights_dict_cp[key], masks[key])
-                imgs_syn = get_all_condensed_images(weights_dict_cp, real_imgs, classes, masks, strategy.device)
+                    if 'Train' in self.mask:
+                        weights_dict_cp[key], masks_cp[key] = normalize_coefficients(weights_dict_cp[key], 
+                                                                                  masks_cp[key])
+                    else:
+                        weights_dict_cp[key] = normalize_coefficients(weights_dict_cp[key], masks_cp[key])
+                imgs_syn = get_all_condensed_images(weights_dict_cp, real_imgs, classes, masks_cp, strategy.device)
             net = update_network(self, imgs_syn, label_syn, strategy,
                                     optimizer_net, net)
 
@@ -209,24 +228,36 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
             for i in range(len(mask)):
                 indexes = [2 * i, 2 * i + 1]
                 mask[i][indexes] = 1.0
-            masks[c] = mask
         elif 'No' in self.mask:
             mask = torch.ones(size=weight.shape, requires_grad=False, device=strategy.device)
-        
+        elif 'Train' in self.mask:
+            mask = torch.rand(size=weight.shape, requires_grad=False, device=strategy.device)
         masks[c] = mask
 
     with torch.no_grad():
         for c in classes:
             weights_dict[c] = weights_dict[c] * masks[c]
-            weights_dict[c] = normalize_coefficients(weights_dict[c], masks[c])
+            if 'Train' in self.mask:
+                weights_dict[c], masks[c] = normalize_coefficients(weights_dict[c], masks[c])
+                masks[c].requires_grad = True
+            else:
+                weights_dict[c] = normalize_coefficients(weights_dict[c], masks[c])
             weights_dict[c].requires_grad = True
 
     if self.debug:
         with torch.no_grad():
-            imgs = get_all_condensed_images(weights_dict, real_imgs, classes, masks,strategy.device)
+            imgs = get_all_condensed_images(weights_dict, real_imgs, classes, masks, strategy.device)
             save_images(self.dataset, self.mem_size, imgs,
                         log + '_' + str(exp_counter) + '_start', 'single', self.wandb_logger, exp_counter)
-    
+
+    if 'Train' in self.mask:
+
+        optimizer_mask = torch.optim.SGD(
+            [mask for mask in masks.values()],
+            lr=self.lr_w, weight_decay=self.l2_w, momentum=0.5
+            )
+        optimizer_mask.zero_grad()
+
     optimizer_weights = torch.optim.SGD(
         [weights for weights in weights_dict.values()],
         lr=self.lr_w, weight_decay=self.l2_w, momentum=0.5

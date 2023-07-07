@@ -344,7 +344,7 @@ if __name__ == "__main__":
     parser.add_argument('--val_size', type=int, default=0,
                         help='validation size')
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--mask', type=str, default='default')
+    parser.add_argument('--mask', type=str, default='Trainable')
 
     args = parser.parse_args()
 

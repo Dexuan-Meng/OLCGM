@@ -207,7 +207,10 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
         if 'default' in self.mask:
             mask = torch.zeros(size=weight.shape,requires_grad=False,device=strategy.device)
             for i in range(len(mask)):
-                indexes = [2 * i, 2 * i + 1]
+                indexes = [(2 * i) % (2*len(mask)), 
+                           (2 * i + 1) % (2*len(mask)), 
+                           (2 * i + 2) % (2*len(mask))
+                           ]
                 mask[i][indexes] = 1.0
             masks[c] = mask
         elif 'No' in self.mask:

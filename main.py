@@ -156,7 +156,8 @@ def run_experiment(args):
             'dataset': args.dataset,
             'l2_w': args.l2_w,
             'debug': args.debug,
-            'plugin': args.plugin
+            'plugin': args.plugin,
+            'mem_bsfactor': args.mem_bsfactor
         }
 
     if args.plugin == 'lcgm' or  args.plugin == 'gm':
@@ -344,6 +345,7 @@ if __name__ == "__main__":
     parser.add_argument('--val_size', type=int, default=0,
                         help='validation size')
     parser.add_argument('--seed', '-s', type=int, default=0)
+    parser.add_argument('--mem_bsfactor', '-mbf', type=int, default=1)
 
     args = parser.parse_args()
 

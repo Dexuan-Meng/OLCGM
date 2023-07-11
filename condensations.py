@@ -163,9 +163,11 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
                 if 'Train' in self.mask:
                     with torch.no_grad():
                         for c in masks.keys():
-                            _, idx = torch.sort(mask[c], descending=True)
-                            mask_mask = idx < 2
-                            masks[c][i] = mask[c][i] * mask_mask
+                            for i in range(len(masks[c])):
+                                _, idx = torch.sort(masks[c][i], descending=True)
+                                mask_mask = idx < 2
+                                masks[c][i] = torch.tensor(masks[c][i] * mask_mask, dtype=torch.float)
+                            # masks[c].dtype = torch.float
 
             if ol == self.outer_loop - 1:
                 break
@@ -272,11 +274,18 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
             weights_dict[key] = normalize_coefficients(weights_dict[key], masks[key])
     
     condensed_datasets = {}
-    for c in classes:
-        weights_dict[c] = normalize_coefficients(weights_dict[c], masks[c])
-        imgs = getImagesLinearComb(weights_dict[c], real_imgs[c][:][0], masks[c], strategy.device).detach()
-        imgs = imgs.to('cpu')
-        condensed_datasets[c] = AvalancheTensorDataset(imgs, [c for _ in range(len(imgs))])
+    if 'Train' in self.mask:
+        for c in classes:
+            weights_dict[c], masks[c] = normalize_coefficients(weights_dict[c], masks[c])
+            imgs = getImagesLinearComb(weights_dict[c], real_imgs[c][:][0], masks[c], strategy.device).detach()
+            imgs = imgs.to('cpu')
+            condensed_datasets[c] = AvalancheTensorDataset(imgs, [c for _ in range(len(imgs))])
+    else:
+        for c in classes:
+            weights_dict[c] = normalize_coefficients(weights_dict[c], masks[c])
+            imgs = getImagesLinearComb(weights_dict[c], real_imgs[c][:][0], masks[c], strategy.device).detach()
+            imgs = imgs.to('cpu')
+            condensed_datasets[c] = AvalancheTensorDataset(imgs, [c for _ in range(len(imgs))])
 
     if self.debug:
         with torch.no_grad():

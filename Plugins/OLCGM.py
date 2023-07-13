@@ -14,7 +14,8 @@ from condensations import condenseImagesLinearComb, condenseImagesOriginalGradie
 
 class OLCGM(ReplayPlugin):
 
-    def __init__(self, mem_size=200, wandb_logger=None, **kwargs):
+    def __init__(self, mem_size=200, wandb_logger=None, mem_bsfactor=1,**kwargs):
+        self.mem_bsfactor = mem_bsfactor
         self.ext_mem = {}
         storage_policy = OnlineGradientMatchingStoragePolicy(
             ext_mem=self.ext_mem, mem_size=mem_size, adaptive_size=True, 
@@ -29,16 +30,27 @@ class OLCGM(ReplayPlugin):
             memory = AvalancheConcatDataset(self.ext_mem.values())
             indices = list(range(len(memory)))
             random.shuffle(indices)
-            indices = indices[:strategy.train_mb_size]
+            indices = indices[:self.mem_bsfactor * strategy.train_mb_size]
             mini_batch_memory = AvalancheSubset(memory, indices)
 
-            strategy.dataloader = ReplayDataLoader(
-                data=strategy.adapted_dataset,
-                memory=mini_batch_memory,
-                num_workers=num_workers,
-                batch_size= 2 * strategy.train_mb_size,
-                oversample_small_tasks=False,
-                shuffle=shuffle, drop_last=True)
+            if self.mem_bsfactor == 1:
+                strategy.dataloader = ReplayDataLoader(
+                        data=strategy.adapted_dataset,
+                        memory=mini_batch_memory,
+                        num_workers=num_workers,
+                        batch_size= 2 * strategy.train_mb_size,
+                        oversample_small_tasks=False,
+                        shuffle=shuffle, drop_last=True)
+            else:
+                strategy.dataloader = ReplayDataLoader(
+                    data=strategy.adapted_dataset,
+                    memory=mini_batch_memory,
+                    num_workers=num_workers,
+                    batch_size= (self.mem_bsfactor + 1) * strategy.train_mb_size,
+                    oversample_small_tasks=False,
+                    shuffle=shuffle, drop_last=True,
+                    force_data_batch_size=10)
+            
 
     def after_training_exp(self, strategy, **kwargs):
         self.storage_policy(strategy, **kwargs)
@@ -51,7 +63,8 @@ class OnlineGradientMatchingStoragePolicy(StoragePolicy):
                  Optional["ClassExemplarsSelectionStrategy"] = None,
                  iteration=1, outer_loop=1, lr_w=0.1, l2_w=0.0,
                  image_size=(1, 28, 28), inner_loop=1, dataset='mnist',
-                 debug=False, k=5, dl=1, plugin='', condense_new_data=False):
+                 debug=False, k=5, dl=1, plugin='', mem_bsfactor=1, 
+                 condense_new_data=False):
 
         super().__init__(ext_mem, mem_size)
         self.selection_strategy = selection_strategy or \
@@ -75,6 +88,7 @@ class OnlineGradientMatchingStoragePolicy(StoragePolicy):
         self.counter_k = k
         self.dl = dl
         self.plugin = plugin
+        self.mbf = mem_bsfactor
         self.statistics = {}
         if not self.adaptive_size:
             assert self.total_num_classes > 0, \

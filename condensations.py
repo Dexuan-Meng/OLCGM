@@ -239,9 +239,8 @@ def condenseImagesLinearComb(self, real_imgs, num_condensed_imgs, strategy, log=
     iterationBody(self, strategy, real_imgs, weights_dict, criterion,
                     classes, optimizer_weights, masks)
     
-    if 'Normal' in self.mask:
-        for key in weights_dict.keys():
-            weights_dict[key] = normalize_coefficients(weights_dict[key], masks[key])
+    for key in weights_dict.keys():
+        weights_dict[key] = normalize_coefficients(weights_dict[key], masks[key])
     
     condensed_datasets = {}
     for c in classes:

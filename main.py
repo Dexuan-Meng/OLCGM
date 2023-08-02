@@ -2,6 +2,7 @@ import torch
 import random
 import numpy as np
 import argparse
+import time
 
 from torch.nn import CrossEntropyLoss
 from torch.optim import SGD
@@ -43,10 +44,14 @@ def set_seed(seed):
 
 
 def run_experiment(args):
+
+    start_time = time.time()
+    
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     experiences = 5
     epochs = 1
 
+    args.tag = args.tag + + str(int(time.time() * 1000) % 100000)
     if args.seed >= 0:
         set_seed(args.seed)
     else:
@@ -273,35 +278,6 @@ def run_experiment(args):
 #      }
 # }
 
-# sweep_configuration_2 = {
-#     'method': 'grid',
-#     'name': 'sweep',
-#     'metric': {'goal': 'maximize', 'name': 'val_acc'},
-#     'parameters': 
-#     {
-#         'batch_size': {'values': [16, 32, 64]},
-#         'epochs': {'values': [5, 10, 15]},
-#         'lr': {'max': 0.1, 'min': 0.0001}
-#      }
-# }
-
-# sweep_configuration_olcgm = {
-#     'method': 'grid',
-#     'name': 'olcgm_M10_mnist_fashion',
-#     'metric': {'goal': 'maximize', 'name': 'Top1_Acc_Stream/eval_phase/test_stream/Task000'},
-#     'parameters': 
-#     {
-#         'ol': {'values': [100, 200]},
-#         'il': {'values': [1]},
-#         'lr': {'values': [0.1, 0.01]},
-#         'dataset': {'values': ["mnist", "fashion"]},
-#         'model_name': {'values': ["mlp"]},
-#         'memory': {'values': [10]},
-#         # 'memory': {'values': [10, 20, 50, 100, 200]},
-#         'k': {'values': [10]},
-#         'plugin': {'values': ['olcgm']}
-#      }
-# }
 # # Initialize sweep by passing in config. 
 # sweep_id = wandb.sweep(
 #   sweep=sweep_configuration_olcgm, 
@@ -344,6 +320,7 @@ if __name__ == "__main__":
     parser.add_argument('--val_size', type=int, default=0,
                         help='validation size')
     parser.add_argument('--seed', '-s', type=int, default=0)
+    parser.add_argument('tag', type=int, default='None', help='tag for grouping in wandb-chart')
 
     args = parser.parse_args()
 

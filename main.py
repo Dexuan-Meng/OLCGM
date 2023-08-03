@@ -7,8 +7,8 @@ import time
 from torch.nn import CrossEntropyLoss
 from torch.optim import SGD
 
-import sys
-sys.path.append('avalanche')
+# import sys
+# sys.path.append('avalanche')
 
 from avalanche.benchmarks import nc_benchmark
 from avalanche.training.strategies import Naive
@@ -27,7 +27,7 @@ from Plugins.LCGM import LCGM
 from Plugins.OLCGM import OLCGM
 from Plugins.OnlineReplay import OnlineReplay
 
-from utils import get_modified_dataset, get_network
+from utils import get_modified_dataset, get_network, log_metrics
 from avalanche.benchmarks import data_incremental_benchmark, benchmark_with_validation_stream
 
 import wandb
@@ -42,16 +42,35 @@ def set_seed(seed):
     torch.backends.cudnn.deterministic = True
 
 
-
 def run_experiment(args):
 
+    # Initialize Loggers.
+    if args.run is not None:
+        args.run = args.run + str(int(time.time() * 1000) % 100000)
+
+    loggers = []
+    if args.logger == 1:
+        loggers.append(InteractiveLogger())
+
+    wandb_logger = None
+    logger = None
+    if args.run is not None and args.logger == 1:
+        args.project = 'OLCGM'
+        wandb_logger = WandBLogger(project_name='OLCGM', run_name=args.run,
+                                   config=args)
+        loggers.append(wandb_logger)
+
+    args = type('', (), {})()
+    print(wandb_logger.config.__dict__)
+    for key in wandb_logger.config.__dict__:
+        setattr(args, key, wandb_logger.config.__dict__[key])
+
     start_time = time.time()
-    
+
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     experiences = 5
     epochs = 1
 
-    args.tag = args.tag + + str(int(time.time() * 1000) % 100000)
     if args.seed >= 0:
         set_seed(args.seed)
     else:
@@ -135,19 +154,6 @@ def run_experiment(args):
     experienceForgetting = ExperienceForgetting()
     minibatchLoss = MinibatchLoss()
 
-    loggers = []
-    if args.logger == 1:
-        loggers.append(InteractiveLogger())
-
-    wandb_logger = None
-    logger = None
-    if args.run is not None and args.logger == 1:
-        args.project = 'OLCGM'
-
-        wandb_logger = WandBLogger(project_name='OLCGM', run_name=args.run,
-                                   config=args)
-        loggers.append(wandb_logger)
-
     model = get_network(args.model_name, image_size)
 
     condensation_args = {
@@ -208,7 +214,8 @@ def run_experiment(args):
     )
 
     accuracies = {}
-
+    final_time_cost = time.time() - start_time
+    log_metrics(wandb_logger, final_time_cost, 'Final Time Cost')
     for i, step in enumerate(scenario.train_stream):
         metrics = None
         cl_strategy.train(step, num_workers=0)
@@ -262,6 +269,7 @@ def run_experiment(args):
         print(condensation_args)
         print('final forgetting: ', final_forgetting)
         print('final accuracy: ', final_accuracy)
+    
     return final_forgetting, final_accuracy
 
 
@@ -287,7 +295,7 @@ def run_experiment(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_ex', type=int, default=500,
+    parser.add_argument('--num_ex', type=int, default=6000,
                         help='number of examples used')
     parser.add_argument('-m', '--memory', type=int, default=100,
                         help='total memory size')
@@ -301,11 +309,11 @@ if __name__ == "__main__":
                         help='number of iterations in the inner loop')
     parser.add_argument('--lr_w', type=float, default=0.01,
                         help='learning rate to optimize the model used to condense the images')
-    parser.add_argument('--run', type=str, default=None,
+    parser.add_argument('--run', type=str, default='LCDM',
                         help='Name of the wandb run if not specified wandb will not be used')
     parser.add_argument('--l2_w', type=float, default=0.0,
                         help='l2 weight decay used in the optimiizer of the coefficient of the linear combination')
-    parser.add_argument('--plugin', type=str, default='olcgm', choices=['olcgm', 'lcgm', 'rr', 'orr', 'gm', 'ogm'],
+    parser.add_argument('--plugin', type=str, default='lcgm', choices=['olcgm', 'lcgm', 'rr', 'orr', 'gm', 'ogm'],
                         help='plugin to use: rr is random replay')
     parser.add_argument('--logger', type=int, default=1, choices=[0, 1],
                         help='1 if you want to log the metrics') 
@@ -320,7 +328,7 @@ if __name__ == "__main__":
     parser.add_argument('--val_size', type=int, default=0,
                         help='validation size')
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('tag', type=int, default='None', help='tag for grouping in wandb-chart')
+    # parser.add_argument('--tag', type=str, default='None', help='tag for grouping in wandb-chart')
 
     args = parser.parse_args()
 

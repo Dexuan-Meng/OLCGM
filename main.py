@@ -44,6 +44,8 @@ def set_seed(seed):
 
 def run_experiment(args):
 
+    args.condense_nw = 1
+
     # Initialize Loggers.
     if args.run is not None:
         args.run = args.run + str(int(time.time() * 1000) % 100000)
@@ -55,8 +57,8 @@ def run_experiment(args):
     wandb_logger = None
     logger = None
     if args.run is not None and args.logger == 1:
-        args.project = 'OLCGM'
-        wandb_logger = WandBLogger(project_name='OLCGM', run_name=args.run,
+        args.project = 'LCGMF'
+        wandb_logger = WandBLogger(project_name=args.project, run_name=args.run,
                                    config=args)
         loggers.append(wandb_logger)
 
@@ -214,8 +216,7 @@ def run_experiment(args):
     )
 
     accuracies = {}
-    final_time_cost = time.time() - start_time
-    log_metrics(wandb_logger, final_time_cost, 'Final Time Cost')
+
     for i, step in enumerate(scenario.train_stream):
         metrics = None
         cl_strategy.train(step, num_workers=0)
@@ -269,7 +270,9 @@ def run_experiment(args):
         print(condensation_args)
         print('final forgetting: ', final_forgetting)
         print('final accuracy: ', final_accuracy)
-    
+
+    final_time_cost = time.time() - start_time
+    log_metrics(wandb_logger, final_time_cost, 'Final Time Cost')
     return final_forgetting, final_accuracy
 
 
@@ -295,13 +298,13 @@ def run_experiment(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_ex', type=int, default=6000,
+    parser.add_argument('--num_ex', type=int, default=-1,
                         help='number of examples used')
     parser.add_argument('-m', '--memory', type=int, default=100,
                         help='total memory size')
     parser.add_argument('-d', '--dataset', type=str, default='mnist',
                         choices=['mnist', 'cifar10', 'fashion', 'svhn'])
-    parser.add_argument('--model_name', type=str, default='mlp',
+    parser.add_argument('--model_name', type=str, default='cnn',
                         choices=['mlp', 'resnet', 'mlp_paper', 'cnn'])
     parser.add_argument('--ol', type=int, default=20,
                         help='number of iterations in the outer loop')
@@ -325,7 +328,7 @@ if __name__ == "__main__":
                         help='size of the mini-batchs')
     parser.add_argument('--k', type=int, default=5,
                         help='condensation rate')
-    parser.add_argument('--val_size', type=int, default=0,
+    parser.add_argument('--val_size', type=int, default=1280,
                         help='validation size')
     parser.add_argument('--seed', '-s', type=int, default=0)
     # parser.add_argument('--tag', type=str, default='None', help='tag for grouping in wandb-chart')

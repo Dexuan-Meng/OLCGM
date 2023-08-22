@@ -142,7 +142,7 @@ class GradientMatchingStoragePolicy(StoragePolicy):
                         strategy, c_dataset)[:5*curr_size] # TODO: occhio 5*
                 cl_datasets[c] = AvalancheSubset(cl_datasets[c], c_ds_idxs)
 
-            condensed_new_images = self.condenseImagesLinearComb(
+            condensed_new_images = condenseImagesLinearComb(self,
                 cl_datasets, num_new_condensed_images, strategy, log='new')
 
             for c, c_condensed_new in condensed_new_images.items():

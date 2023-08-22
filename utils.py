@@ -11,6 +11,7 @@ from os.path import expanduser
 from model import ResNet18
 from avalanche.models import SimpleMLP
 from torchvision.utils import make_grid, save_image
+from networks import MLP, ConvNet, LeNet, AlexNet, AlexNetBN, VGG11, VGG11BN, ResNet18BN_AP, ResNet18BN
 
 from matplotlib import pyplot as plt
 from avalanche.evaluation.metric_results import MetricValue
@@ -132,11 +133,20 @@ def save_images(dataset, mem_size, imgs, name, save_type='single', wandb_logger=
             image = transforms.ToPILImage()(grid)
             log_metrics(wandb_logger, image, filename)
 
+
+def get_default_convnet_setting():
+    num_classes, net_width, net_depth, net_act, net_norm, net_pooling = 10, 128, 3, 'relu', 'instancenorm', 'avgpooling'
+    return num_classes, net_width, net_depth, net_act, net_norm, net_pooling
+
+
 def get_network(model_name, image_size):
+    num_classes, net_width, net_depth, net_act, net_norm, net_pooling = get_default_convnet_setting()
     if model_name == 'mlp':
         input_size = image_size[0] * image_size[1] * image_size[2]
         model = SimpleMLP(num_classes=10, hidden_size=400,
                           input_size=input_size)
+    elif model_name == 'cnn':
+        model = ConvNet(channel=image_size[0], num_classes=num_classes, net_width=net_width, net_depth=net_depth, net_act=net_act, net_norm=net_norm, net_pooling=net_pooling, im_size=(image_size[1], image_size[2]))
     elif model_name == 'resnet':
         model = ResNet18(nclasses=10,input_size=image_size,  nf=20)
     else:

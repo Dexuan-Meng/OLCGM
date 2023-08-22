@@ -86,53 +86,61 @@ class GradientMatchingStoragePolicy(StoragePolicy):
         class_mem_size = self.mem_size // div_cnt
         class_rem_value = self.mem_size % div_cnt
 
-        if strategy.training_exp_counter > 0:
-            # class_rem_value = self.mem_size % div_cnt
-            images_to_condense = {}
-            num_condensed_images = {}
-            for c, c_mem in self.ext_mem.items():
-                sorted_idxs = self.selection_strategy.make_sorted_indices(
-                    strategy, c_mem)
+
+        if self.plugin != 'ccmcl':
+
+            if strategy.training_exp_counter > 0:
+                # class_rem_value = self.mem_size % div_cnt
+                images_to_condense = {}
+                num_condensed_images = {}
+                for c, c_mem in self.ext_mem.items():
+                    sorted_idxs = self.selection_strategy.make_sorted_indices(
+                        strategy, c_mem)
+                    curr_size = class_mem_size
+                    if class_rem_value > 0: curr_size += 1
+                    class_rem_value -= 1
+
+                    n = 2 * curr_size - len(c_mem)
+
+                    if (curr_size - n) > 0:
+                        num_condensed_images[c] = curr_size - n
+                        idxs_to_keep = sorted_idxs[:n]
+                        idxs_to_condense = sorted_idxs[n:]
+
+                        images_to_condense[c] = AvalancheSubset(
+                            c_mem, idxs_to_condense)
+
+                        self.ext_mem[c] = AvalancheSubset(
+                                            self.ext_mem[c],
+                                            idxs_to_keep)
+                if self.plugin == 'lcgm':
+                    condensed_images = condenseImagesLinearComb(self,
+                                        images_to_condense, num_condensed_images, strategy, log='mem')
+                elif self.plugin == 'gm':
+                    condensed_images = condenseImagesOriginalGradientMatching(self,
+                                        images_to_condense, num_condensed_images, strategy, log='mem')
+                else:
+                    assert False, 'Wrong condensation type'
+
+                for c, c_condensed in condensed_images.items():
+                    self.ext_mem[c] = AvalancheConcatDataset([self.ext_mem[c], c_condensed]) 
+
+        num_new_condensed_images = {}
+        if self.plugin == 'ccmcl':
+            assert self.condense_new_data, 'New data must be condensed in CCMCL'
+            for c, c_dataset in cl_datasets.items():
+                num_new_condensed_images[c] = self.mem_size // 10
+        else:
+            for c, c_dataset in cl_datasets.items():
                 curr_size = class_mem_size
                 if class_rem_value > 0: curr_size += 1
                 class_rem_value -= 1
-
-                n = 2 * curr_size - len(c_mem)
-
-                if (curr_size - n) > 0:
-                    num_condensed_images[c] = curr_size - n
-                    idxs_to_keep = sorted_idxs[:n]
-                    idxs_to_condense = sorted_idxs[n:]
-
-                    images_to_condense[c] = AvalancheSubset(
-                        c_mem, idxs_to_condense)
-
-                    self.ext_mem[c] = AvalancheSubset(
-                                        self.ext_mem[c],
-                                        idxs_to_keep)
-            if self.plugin == 'lcgm':
-                condensed_images = condenseImagesLinearComb(self,
-                                    images_to_condense, num_condensed_images, strategy, log='mem')
-            elif self.plugin == 'gm':
-                condensed_images = condenseImagesOriginalGradientMatching(self,
-                                    images_to_condense, num_condensed_images, strategy, log='mem')
-            else:
-                assert False, 'Wrong condensation type'
-
-            for c, c_condensed in condensed_images.items():
-                self.ext_mem[c] = AvalancheConcatDataset([self.ext_mem[c], c_condensed]) 
-
-        num_new_condensed_images = {}
-        for c, c_dataset in cl_datasets.items():
-            curr_size = class_mem_size
-            if class_rem_value > 0: curr_size += 1
-            class_rem_value -= 1
-            if self.condense_new_data:
-                num_new_condensed_images[c] = curr_size
-            else:
-                c_ds_idxs = self.selection_strategy.make_sorted_indices(
-                    strategy, c_dataset)[:curr_size]
-                cl_datasets[c] = AvalancheSubset(cl_datasets[c], c_ds_idxs)
+                if self.condense_new_data:
+                    num_new_condensed_images[c] = curr_size
+                else:
+                    c_ds_idxs = self.selection_strategy.make_sorted_indices(
+                        strategy, c_dataset)[:curr_size]
+                    cl_datasets[c] = AvalancheSubset(cl_datasets[c], c_ds_idxs)
 
         if self.condense_new_data:
             if self.debug:

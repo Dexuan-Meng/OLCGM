@@ -160,7 +160,7 @@ def run_experiment(args):
 
     condensation_args = {
             'lr_net': 0.1,
-            'iteration': 1,
+            'iteration': 10,
             'outer_loop': args.ol,
             'inner_loop': args.il,
             'image_size': image_size,
@@ -173,6 +173,9 @@ def run_experiment(args):
         }
 
     if args.plugin == 'lcgm' or  args.plugin == 'gm':
+        lcgm = LCGM(mem_size=args.memory, wandb_logger=wandb_logger, **condensation_args)
+        plugins = [lcgm]
+    if args.plugin == 'ccmcl':
         lcgm = LCGM(mem_size=args.memory, wandb_logger=wandb_logger, **condensation_args)
         plugins = [lcgm]
     elif args.plugin == 'olcgm' or args.plugin == 'ogm':
@@ -316,7 +319,7 @@ if __name__ == "__main__":
                         help='Name of the wandb run if not specified wandb will not be used')
     parser.add_argument('--l2_w', type=float, default=0.0,
                         help='l2 weight decay used in the optimiizer of the coefficient of the linear combination')
-    parser.add_argument('--plugin', type=str, default='lcgm', choices=['olcgm', 'lcgm', 'rr', 'orr', 'gm', 'ogm'],
+    parser.add_argument('--plugin', type=str, default='ccmcl', choices=['olcgm', 'lcgm', 'rr', 'orr', 'gm', 'ogm', 'ccmcl'],
                         help='plugin to use: rr is random replay')
     parser.add_argument('--logger', type=int, default=1, choices=[0, 1],
                         help='1 if you want to log the metrics') 

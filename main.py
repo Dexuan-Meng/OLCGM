@@ -298,7 +298,7 @@ def run_experiment(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_ex', type=int, default=-1,
+    parser.add_argument('--num_ex', type=int, default=200,
                         help='number of examples used')
     parser.add_argument('-m', '--memory', type=int, default=100,
                         help='total memory size')
